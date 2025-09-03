@@ -1,0 +1,43 @@
+# Arquivos de ambiente e segredos (MUITO IMPORTANTE)
+# Nunca envie suas senhas para o GitHub!
+.env
+
+# Dados do banco de dados local do PostgreSQL
+# Esta pasta pode ficar enorme e contém dados binários.
+dbdata/
+
+# Dados gerados pelo pipeline do Airflow (Staging Area)
+# São dados transitórios, não código-fonte.
+output/
+
+# Cache e artefatos do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+
+# Ambientes virtuais do Python
+# Cada desenvolvedor cria o seu, não deve ser compartilhado.
+venv/
+.venv/
+env/
+.env/
+
+# Arquivos de IDE (Ex: VSCode, PyCharm)
+# Configurações específicas do seu editor.
+.vscode/
+.idea/
+
+# Arquivos de sistema operacional
+# Lixo gerado pelo macOS, Windows, etc.
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Arquivos de vídeo ou outros arquivos grandes de entrega
+# O Git não é feito para armazenar arquivos binários grandes.
+*.mp4
+*.mov
+*.zip

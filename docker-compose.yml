@@ -1,0 +1,96 @@
+services:
+  db:
+    image: postgres:16
+    container_name: postgres_dw
+    environment:
+      - POSTGRES_USER=${USER_POSTGRE}
+      - POSTGRES_PASSWORD=${PASSWORD_POSTGRE}
+      - POSTGRES_DB=${DB_POSTGRE}
+    volumes:
+      - ./dbdata:/var/lib/postgresql/data
+      - ./banvic.sql:/docker-entrypoint-initdb.d/banvic.sql
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${USER_POSTGRE} -d ${DB_POSTGRE}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  apache_metadados_db:
+    image: postgres:16
+    container_name: apache_metadados_db
+    environment:
+      - POSTGRES_USER=${USER_APACHE}
+      - POSTGRES_PASSWORD=${PASSWORD_APACHE}
+      - POSTGRES_DB=${NAME_APACHE}
+    volumes:
+      - metadados_db_volume:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${USER_APACHE} -d ${NAME_APACHE}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  apache_init:
+    image: apache/airflow:2.8.0
+    container_name: apache_init
+    depends_on:
+      apache_metadados_db:
+        condition: service_healthy
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${USER_APACHE}:${PASSWORD_APACHE}@apache_metadados_db/${NAME_APACHE}
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    command: >
+      bash -c "
+        airflow db init &&
+        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com
+      "
+
+  apache_webserver:
+    build: .
+    container_name: apache_webserver
+    depends_on:
+      apache_init:
+        condition: service_completed_successfully
+    environment:
+      - AIRFLOW__WEBSERVER__SECRET_KEY=4873051ce53ee1be8c9b7047966319a8
+      - USER_POSTGRE=${USER_POSTGRE}
+      - PASSWORD_POSTGRE=${PASSWORD_POSTGRE}
+      - DB_POSTGRE=${DB_POSTGRE}
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${USER_APACHE}:${PASSWORD_APACHE}@apache_metadados_db/${NAME_APACHE}
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      - AIRFLOW_CONN_CONEXAO_DATA_WAREHOUSE=postgresql://${USER_POSTGRE}:${PASSWORD_POSTGRE}@db:5432/${DB_POSTGRE}
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./dados:/opt/airflow/dados
+      - ./output:/opt/airflow/output
+    ports:
+      - "8080:8080"
+    command: webserver
+
+  apache_scheduler:
+    build: .
+    container_name: apache_scheduler
+    depends_on:
+      apache_init:
+        condition: service_completed_successfully
+    environment:
+      - AIRFLOW__WEBSERVER__SECRET_KEY=4873051ce53ee1be8c9b7047966319a8
+      - USER_POSTGRE=${USER_POSTGRE}
+      - PASSWORD_POSTGRE=${PASSWORD_POSTGRE}
+      - DB_POSTGRE=${DB_POSTGRE}
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${USER_APACHE}:${PASSWORD_APACHE}@apache_metadados_db/${NAME_APACHE}
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW_CONN_CONEXAO_DATA_WAREHOUSE=postgresql://${USER_POSTGRE}:${PASSWORD_POSTGRE}@db:5432/${DB_POSTGRE}
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./dados:/opt/airflow/dados
+      - ./output:/opt/airflow/output
+    command: scheduler
+
+volumes:
+  metadados_db_volume:
